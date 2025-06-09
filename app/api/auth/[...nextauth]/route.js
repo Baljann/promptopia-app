@@ -10,35 +10,54 @@ const handler = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     }),
   ],
-  async session({ session }) {
-    const sessionUser = await User.findOne({
-      email: session.user.email,
-    });
-    session.user.id = sessionUser._id.toString();
-    return session;
-  },
-
-  async signIn({ profile }) {
-    try {
-      await connectToDB();
-      // check if user already exists
-      const userExists = await User.findOne({
-        email: profile.email,
-      });
-      // if not, create user
-      if (!userExists) {
-        await User.create({
-          email: profile.email,
-          username: profile.name.replace(" ", "").toLowerCase(),
-          image: profile.picture,
-        });
+  callbacks: {
+    async session({ session }) {
+      // Get the user from database
+      const user = await User.findOne({ email: session.user.email });
+      // Add user id to session
+      session.user.id = user._id.toString();
+      return session;
+    },
+    async signIn({ profile }) {
+      console.log("SignIn callback triggered. Profile:", profile);
+      if (!profile || !profile.email) {
+        console.error("SignIn callback error: Profile or email is missing.");
+        return false;
       }
-      return true;
-    } catch (error) {
-      console.log(error);
-      return false;
-    }
+
+      try {
+        await connectToDB();
+        console.log("Database connected successfully.");
+
+        // check if user already exists
+        const userExists = await User.findOne({
+          email: profile.email,
+        });
+
+        console.log("User exists check:", userExists ? "Yes" : "No");
+
+        // if not, create user
+        if (!userExists) {
+          console.log("Creating new user...");
+          await User.create({
+            email: profile.email,
+            username: profile.name.replace(" ", "").toLowerCase(),
+            image: profile.picture,
+          });
+          console.log("New user created successfully.");
+        }
+
+        console.log("SignIn successful, returning true.");
+        return true;
+      } catch (error) {
+        console.error("SignIn callback error:", error);
+        return false;
+      }
+    },
   },
 });
 
 export { handler as GET, handler as POST };
+
+console.log("🔐 ENV TEST:", process.env.NEXTAUTH_URL);
+
